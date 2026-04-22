@@ -7,9 +7,9 @@ from app.db.database import get_session
 from app.db.models import Student
 from app.schemas.student import StudentCreate, StudentResponse, StudentUpdate
 
+
 router = APIRouter(prefix="/students", tags=["Students"])
 
-# Завдання 9: Статистика (ВАЖЛИВО: має бути перед /{student_id}, щоб уникнути конфлікту маршрутів)
 @router.get("/stats/summary")
 async def get_stats(db: AsyncSession = Depends(get_session)):
     total_students = await db.scalar(select(func.count(Student.id)))
@@ -34,18 +34,16 @@ async def create_student(student: StudentCreate, db: AsyncSession = Depends(get_
         return new_student
     except IntegrityError:
         await db.rollback()
-        # Завдання 3: Зрозуміла помилка унікальності
         raise HTTPException(status_code=409, detail="Student with this email already exists")
 
-# Завдання 2, 5, 6: Пошук, сортування, пагінація
 @router.get("/", response_model=list[StudentResponse])
 async def get_students(
-    group_name: str | None = None,                 # Завдання 2: Фільтр
-    last_name_contains: str | None = None,         # Завдання 2: Фільтр
-    sort_by: str = "id",                           # Завдання 5: Сортування (поле)
-    sort_order: str = "asc",                       # Завдання 5: Сортування (напрямок)
-    skip: int = 0,                                 # Завдання 6: Пагінація
-    limit: int = 10,                               # Завдання 6: Пагінація
+    group_name: str | None = None,                 
+    last_name_contains: str | None = None,       
+    sort_by: str = "id",                           
+    sort_order: str = "asc",                       
+    skip: int = 0,                                 
+    limit: int = 10,                               
     db: AsyncSession = Depends(get_session)
 ):
     query = select(Student)
@@ -55,7 +53,6 @@ async def get_students(
     if last_name_contains:
         query = query.where(Student.last_name.ilike(f"%{last_name_contains}%"))
 
-    # Безпечне отримання атрибута для сортування
     sort_attr = getattr(Student, sort_by, Student.id)
     if sort_order == "desc":
         query = query.order_by(desc(sort_attr))
@@ -74,14 +71,12 @@ async def get_student(student_id: int, db: AsyncSession = Depends(get_session)):
         raise HTTPException(status_code=404, detail="Student not found")
     return student
 
-# Завдання 4: Часткове оновлення
 @router.patch("/{student_id}", response_model=StudentResponse)
 async def update_student(student_id: int, student_update: StudentUpdate, db: AsyncSession = Depends(get_session)):
     student = await db.get(Student, student_id)
     if not student:
         raise HTTPException(status_code=404, detail="Student not found")
     
-    # Виключаємо поля, які не були передані
     update_data = student_update.model_dump(exclude_unset=True)
     for key, value in update_data.items():
         setattr(student, key, value)

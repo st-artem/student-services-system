@@ -12,4 +12,4 @@ class Student(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     group_name = Column(String, nullable=False)
     is_active = Column(Boolean, default=True)
-    enrollment_year = Column(Integer, nullable=False) # Завдання 1: нове поле
+    enrollment_year = Column(Integer, nullable=False)
