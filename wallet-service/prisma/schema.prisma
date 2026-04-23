@@ -1,0 +1,56 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Wallet {
+  id        String   @id @default(uuid())
+  currency  String   @db.VarChar(3)
+  balance   Decimal  @default(0.0) @db.Decimal(15, 2)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  entries           LedgerEntry[]
+  transfersSent     TransferOperation[] @relation("TransferFrom")
+  transfersReceived TransferOperation[] @relation("TransferTo")
+
+  @@map("wallets")
+}
+
+model TransferOperation {
+  id           String   @id @default(uuid())
+  fromWalletId String   @map("from_wallet_id")
+  toWalletId   String   @map("to_wallet_id")
+  amount       Decimal  @db.Decimal(15, 2)
+  currency     String   @db.VarChar(3)
+  requestId    String   @unique @map("request_id") // ІЗ №7: Ідемпотентність
+  status       String   @default("COMPLETED")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  fromWallet Wallet @relation("TransferFrom", fields: [fromWalletId], references: [id], onDelete: Restrict)
+  toWallet   Wallet @relation("TransferTo", fields: [toWalletId], references: [id], onDelete: Restrict)
+
+  entries LedgerEntry[]
+
+  @@map("transfers")
+}
+
+model LedgerEntry {
+  id            String   @id @default(uuid())
+  walletId      String   @map("wallet_id")
+  transferId    String?  @map("transfer_id")
+  operationType String   @map("operation_type") // "DEPOSIT" | "WITHDRAW"
+  amount        Decimal  @db.Decimal(15, 2)
+  requestId     String   @unique @map("request_id") // ІЗ №7
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  wallet   Wallet             @relation(fields: [walletId], references: [id], onDelete: Restrict)
+  transfer TransferOperation? @relation(fields: [transferId], references: [id], onDelete: Restrict)
+
+  @@index([walletId]) // ІЗ №3: Індекс для швидкого пошуку історії
+  @@map("ledger_entries")
+}
