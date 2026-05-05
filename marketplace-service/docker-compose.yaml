@@ -1,0 +1,14 @@
+services:
+  marketplace-db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: marketplace_db
+    ports:
+      - "5435:5432" # Порт 5435, щоб не конфліктувало з попередніми лабами
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d marketplace_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
