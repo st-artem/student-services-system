@@ -27,21 +27,23 @@ public class ItemController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @Transactional
-    public ItemResponse createItem(@Valid @RequestBody CreateItemRequest request) {
-        Item item = Item.builder()
-                .title(request.title())
-                .description(request.description())
-                .category(request.category())
-                .price(request.price())
-                .currency(request.currency())
-                .sellerReference(request.sellerReference())
-                .tags(request.tags())
-                .status(ItemStatus.DRAFT)
-                .build();
-
+    @Transactional // Важливо!
+    public ItemResponse createItem(@Valid @RequestBody CreateItemRequest request) throws Exception {
+        Item item = Item.builder().title(request.title()).price(request.price()).status(ItemStatus.DRAFT).build();
         itemRepository.save(item);
-        // TODO: ПР8 - Запис події ItemCreatedEvent в Outbox
+
+        // Записуємо подію в Outbox
+        OutboxEvent outboxEvent = OutboxEvent.builder()
+                .id(UUID.randomUUID())
+                .aggregateId(item.getId())
+                .eventType("ItemCreated")
+                .payload(objectMapper.writeValueAsString(item))
+                .correlationId(MDC.get("correlationId"))
+                .status("NEW")
+                .createdAt(Instant.now())
+                .build();
+        outboxEventRepository.save(outboxEvent);
+
         return mapToResponse(item);
     }
 
