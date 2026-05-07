@@ -1,0 +1,153 @@
+services:
+  # --- REVERSE PROXY ---
+  nginx-proxy:
+    image: nginx:1.27-alpine
+    container_name: prois-nginx-proxy
+    ports:
+      - "8080:80"
+    volumes:
+      - ./infrastructure/nginx/conf.d:/etc/nginx/conf.d:ro
+    depends_on:
+      - student-service
+      - order-service
+      - wallet-service
+      # - marketplace-service # Розкоментуй, коли створиш Dockerfile для Java
+    networks:
+      - prois-net
+
+  # --- 1. STUDENT SERVICE (Python) ---
+  student-service:
+    build: ./student-service
+    container_name: student-service
+    expose: ["8000"]
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@student-db:5432/student_db
+    depends_on:
+      student-db:
+        condition: service_healthy
+    networks:
+      - prois-net
+
+  student-db:
+    image: postgres:15-alpine
+    container_name: student-db
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=student_db
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d student_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - prois-net
+
+  # --- 2. ORDER SERVICE (Go) ---
+  order-service:
+    build: ./order-service
+    container_name: order-service
+    expose: ["8080"]
+    env_file: ./order-service/.env
+    environment:
+      - DB_HOST=order-db
+      - REDIS_HOST=order-redis:6379
+    depends_on:
+      order-db:
+        condition: service_healthy
+      order-redis:
+        condition: service_started
+    networks:
+      - prois-net
+
+  order-db:
+    image: postgres:15-alpine
+    container_name: order-db
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=order_db
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d order_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - prois-net
+
+  order-redis:
+    image: redis:7-alpine
+    container_name: order-redis
+    expose: ["6379"]
+    networks:
+      - prois-net
+
+  # --- 3. WALLET SERVICE (Node.js) ---
+  wallet-service:
+    build: ./wallet-service
+    container_name: wallet-service
+    expose: ["8080"]
+    env_file: ./wallet-service/.env
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@wallet-db:5432/wallet_db?schema=public
+    command: sh -c "npx prisma migrate deploy && npx ts-node src/server.ts"
+    depends_on:
+      wallet-db:
+        condition: service_healthy
+    networks:
+      - prois-net
+
+  wallet-db:
+    image: postgres:15-alpine
+    container_name: wallet-db
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=wallet_db
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d wallet_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - prois-net
+
+  # --- 4. MARKETPLACE SERVICE (Java Infrastructure) ---
+  marketplace-db:
+    image: postgres:15-alpine
+    container_name: marketplace-db
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=marketplace_db
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d marketplace_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - prois-net
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+    networks:
+      - prois-net
+
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    networks:
+      - prois-net
+
+networks:
+  prois-net:
+    driver: bridge
