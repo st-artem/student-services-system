@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: marketplace-config
+  namespace: prois
+data:
+  # Використовуємо внутрішній DNS k3d для доступу до БД на хост-машині (з ПР 9)
+  DB_HOST: "host.k3d.internal"
+  DB_PORT: "5435"
+  DB_NAME: "marketplace_db"
+  KAFKA_BROKERS: "host.k3d.internal:9092"

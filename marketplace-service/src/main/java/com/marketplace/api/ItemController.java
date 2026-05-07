@@ -3,11 +3,15 @@ package com.marketplace.api;
 import com.marketplace.api.dto.CreateItemRequest;
 import com.marketplace.api.dto.ItemResponse;
 import com.marketplace.api.dto.UpdateItemRequest;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.marketplace.domain.Item;
 import com.marketplace.domain.ItemStatus;
+import com.marketplace.domain.OutboxEvent;
 import com.marketplace.repository.ItemRepository;
+import com.marketplace.repository.OutboxEventRepository;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.MDC;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -16,6 +20,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Instant;
 import java.util.UUID;
 
 @RestController
@@ -24,6 +29,8 @@ import java.util.UUID;
 public class ItemController {
 
     private final ItemRepository itemRepository;
+    private final OutboxEventRepository outboxEventRepository;
+    private final ObjectMapper objectMapper;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
